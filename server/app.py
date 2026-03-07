@@ -18,7 +18,7 @@ from server.routes import router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.runner = ModelRunner(model_name="project1-placeholder-model")
+    app.state.runner = ModelRunner(model_name="sshleifer/tiny-gpt2")
     app.state.runner.load_model()
     yield
 
