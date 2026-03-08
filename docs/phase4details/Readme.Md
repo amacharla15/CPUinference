@@ -12,11 +12,9 @@ tokenization time
 TTFT
 
 prefill plus first chunk time
-
 stream time
 
-total time
-
+total time and 
 decode tokens/sec estimate
 
 In this phase, I extended the same request lifecycle to also measure:
