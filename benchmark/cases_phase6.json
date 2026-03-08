@@ -1,0 +1,20 @@
+[
+  {
+    "name": "short",
+    "prompt_file": "prompts/bench_short.txt",
+    "max_tokens": 40,
+    "temperature": 0.0
+  },
+  {
+    "name": "medium",
+    "prompt_file": "prompts/bench_medium.txt",
+    "max_tokens": 50,
+    "temperature": 0.0
+  },
+  {
+    "name": "long",
+    "prompt_file": "prompts/bench_long.txt",
+    "max_tokens": 60,
+    "temperature": 0.0
+  }
+]

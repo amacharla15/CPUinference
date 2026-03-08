@@ -1,0 +1,1 @@
+Explain CPU inference in beginner-friendly detail. Describe what happens from the moment a user sends a prompt to the moment streamed text appears on screen. Include tokenization, model loading, prompt processing, first-token generation, decode loop, RAM usage, and why longer prompts can change latency.
