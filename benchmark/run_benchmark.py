@@ -20,6 +20,9 @@ def parse_args():
     parser.add_argument("--warmup_max_tokens", type=int, default=20)
     parser.add_argument("--warmup_temperature", type=float, default=0.0)
     parser.add_argument("--trials", type=int, default=5)
+    parser.add_argument("--phase_name", default="phase8")
+    parser.add_argument("--experiment_name", default="prompt_length")
+    parser.add_argument("--tag", default="")
     return parser.parse_args()
 
 
@@ -162,11 +165,47 @@ def summarize_case(rows):
     return summary
 
 
-def save_raw_results(results, output_dir: Path, stamp: str):
-    json_path = output_dir / f"benchmark_trials_{stamp}.json"
-    csv_path = output_dir / f"benchmark_trials_{stamp}.csv"
+def make_run_id(phase_name: str, experiment_name: str, tag: str, stamp: str) -> str:
+    parts = [phase_name, experiment_name]
+    if tag.strip():
+        parts.append(tag.strip())
+    parts.append(stamp)
+    return "_".join(parts)
 
-    json_path.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+
+def create_run_dirs(output_root: Path, run_id: str):
+    run_dir = output_root / run_id
+    raw_dir = run_dir / "raw"
+    summary_dir = run_dir / "summary"
+
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    summary_dir.mkdir(parents=True, exist_ok=True)
+
+    return run_dir, raw_dir, summary_dir
+
+
+def save_json(path: Path, value):
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def save_csv_rows(path: Path, rows):
+    fieldnames = []
+    for row in rows:
+        for key in row.keys():
+            if key not in fieldnames:
+                fieldnames.append(key)
+
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def save_raw_results(results, raw_dir: Path):
+    json_path = raw_dir / "trials.json"
+    csv_path = raw_dir / "trials.csv"
+
+    save_json(json_path, results)
 
     csv_rows = []
     for item in results:
@@ -174,35 +213,87 @@ def save_raw_results(results, output_dir: Path, stamp: str):
         row.pop("generated_text", None)
         csv_rows.append(row)
 
-    fieldnames = []
-    for row in csv_rows:
-        for key in row.keys():
-            if key not in fieldnames:
-                fieldnames.append(key)
-
-    with csv_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(csv_rows)
+    save_csv_rows(csv_path, csv_rows)
 
     return json_path, csv_path
 
 
-def save_summary_results(summary_rows, output_dir: Path, stamp: str):
-    csv_path = output_dir / f"benchmark_summary_{stamp}.csv"
+def save_summary_results(summary_rows, summary_dir: Path):
+    json_path = summary_dir / "summary.json"
+    csv_path = summary_dir / "summary.csv"
 
-    fieldnames = []
-    for row in summary_rows:
-        for key in row.keys():
-            if key not in fieldnames:
-                fieldnames.append(key)
+    save_json(json_path, summary_rows)
+    save_csv_rows(csv_path, summary_rows)
 
-    with csv_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(summary_rows)
+    return json_path, csv_path
 
-    return csv_path
+
+def write_manifest(
+    run_dir: Path,
+    run_id: str,
+    args,
+    cases,
+    summary_rows,
+    raw_json_path: Path,
+    raw_csv_path: Path,
+    summary_json_path: Path,
+    summary_csv_path: Path,
+):
+    manifest = {
+        "run_id": run_id,
+        "created_at": datetime.now().isoformat(),
+        "phase_name": args.phase_name,
+        "experiment_name": args.experiment_name,
+        "tag": args.tag,
+        "url": args.url,
+        "cases_file": args.cases,
+        "output_dir": args.output_dir,
+        "timeout": args.timeout,
+        "warmup": args.warmup,
+        "warmup_prompt_file": args.warmup_prompt_file,
+        "warmup_max_tokens": args.warmup_max_tokens,
+        "warmup_temperature": args.warmup_temperature,
+        "trials": args.trials,
+        "cases": cases,
+        "case_names": [case["name"] for case in cases],
+        "result_files": {
+            "raw_json": str(raw_json_path.relative_to(run_dir)),
+            "raw_csv": str(raw_csv_path.relative_to(run_dir)),
+            "summary_json": str(summary_json_path.relative_to(run_dir)),
+            "summary_csv": str(summary_csv_path.relative_to(run_dir)),
+        },
+        "summary_preview": summary_rows,
+    }
+
+    manifest_path = run_dir / "manifest.json"
+    save_json(manifest_path, manifest)
+    return manifest_path
+
+
+def update_index(output_root: Path, run_id: str, manifest_path: Path, args):
+    index_path = output_root / "index.csv"
+    row = {
+        "run_id": run_id,
+        "created_at": datetime.now().isoformat(),
+        "phase_name": args.phase_name,
+        "experiment_name": args.experiment_name,
+        "tag": args.tag,
+        "trials": args.trials,
+        "warmup": args.warmup,
+        "cases_file": args.cases,
+        "manifest_path": str(manifest_path.relative_to(output_root)),
+    }
+
+    existing_rows = []
+    if index_path.exists():
+        with index_path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            for item in reader:
+                existing_rows.append(item)
+
+    existing_rows.append(row)
+    save_csv_rows(index_path, existing_rows)
+    return index_path
 
 
 def print_trial_summary(results):
@@ -260,8 +351,8 @@ def main():
 
     project_root = Path(__file__).resolve().parents[1]
     cases_path = project_root / args.cases
-    output_dir = project_root / args.output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_root = project_root / args.output_dir
+    output_root.mkdir(parents=True, exist_ok=True)
 
     cases = load_cases(cases_path)
     results = []
@@ -312,15 +403,35 @@ def main():
         summary_rows.append(summarize_case(grouped[case_name]))
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    raw_json_path, raw_csv_path = save_raw_results(results, output_dir, stamp)
-    summary_csv_path = save_summary_results(summary_rows, output_dir, stamp)
+    run_id = make_run_id(args.phase_name, args.experiment_name, args.tag, stamp)
+    run_dir, raw_dir, summary_dir = create_run_dirs(output_root, run_id)
+
+    raw_json_path, raw_csv_path = save_raw_results(results, raw_dir)
+    summary_json_path, summary_csv_path = save_summary_results(summary_rows, summary_dir)
+    manifest_path = write_manifest(
+        run_dir=run_dir,
+        run_id=run_id,
+        args=args,
+        cases=cases,
+        summary_rows=summary_rows,
+        raw_json_path=raw_json_path,
+        raw_csv_path=raw_csv_path,
+        summary_json_path=summary_json_path,
+        summary_csv_path=summary_csv_path,
+    )
+    index_path = update_index(output_root, run_id, manifest_path, args)
 
     print_trial_summary(results)
     print_aggregate_summary(summary_rows)
     print()
-    print(f"Saved raw JSON:     {raw_json_path}")
-    print(f"Saved raw CSV:      {raw_csv_path}")
-    print(f"Saved summary CSV:  {summary_csv_path}")
+    print(f"Run ID:            {run_id}")
+    print(f"Run directory:     {run_dir}")
+    print(f"Manifest:          {manifest_path}")
+    print(f"Raw JSON:          {raw_json_path}")
+    print(f"Raw CSV:           {raw_csv_path}")
+    print(f"Summary JSON:      {summary_json_path}")
+    print(f"Summary CSV:       {summary_csv_path}")
+    print(f"Results index CSV: {index_path}")
 
 
 if __name__ == "__main__":
