@@ -1,0 +1,125 @@
+data:  
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors 
+
+data: factors
+
+event: done
+data: {"prompt_tokens": 60, "output_tokens_est": 60, "tokenization_ms": 0.429, "ttft_ms": 7.722, "approx_prefill_plus_first_chunk_ms": 8.542, "stream_time_ms": 171.051, "total_time_ms": 179.594, "decode_tokens_per_sec_est": 350.772, "rss_start_mb": 373.711, "peak_rss_mb": 373.719, "rss_end_mb": 373.719, "rss_delta_mb": 0.008, "peak_rss_delta_mb": 0.008, "memory_samples": 17, "memory_sample_interval_ms": 10.0}
+

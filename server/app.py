@@ -14,12 +14,24 @@ from fastapi import FastAPI
 
 from runtime.model_runner import ModelRunner
 from server.routes import router
+import json
+from instrumentation.memory import bytes_to_mb, current_rss_bytes
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.runner = ModelRunner(model_name="sshleifer/tiny-gpt2")
     app.state.runner.load_model()
+    print(
+    json.dumps(
+        {
+            "event": "startup_memory",
+            "rss_after_model_load_mb": round(bytes_to_mb(current_rss_bytes()), 3),
+        },
+        ensure_ascii=False,
+    ),
+    flush=True,
+)
     yield
 
 

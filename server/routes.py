@@ -10,10 +10,10 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from instrumentation.logging_utils import log_request_metrics
+from instrumentation.memory import MemorySampler
 from instrumentation.timers import elapsed_ms, now_s
 from runtime.model_runner import ModelRunner
 from server.schemas import GenerationRequest
-
 
 router = APIRouter()
 
@@ -31,10 +31,14 @@ def generate(request_data: GenerationRequest, request: Request) -> StreamingResp
         raise HTTPException(status_code=500, detail="Model runner not initialized")
 
     request_start_s = now_s()
+    memory_sampler = MemorySampler(interval_ms=10.0)
+    memory_sampler.start()
 
     try:
         inputs, prompt_tokens, tokenization_ms = runner.tokenize_prompt(request_data.prompt)
+        tokenization_end_s = now_s()
     except RuntimeError as exc:
+        memory_sampler.stop()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     def event_stream():
@@ -64,6 +68,7 @@ def generate(request_data: GenerationRequest, request: Request) -> StreamingResp
             error_message = str(exc)
             yield f"event: error\ndata: {str(exc)}\n\n"
         finally:
+            memory_metrics = memory_sampler.stop()
             end_s = now_s()
             generated_text = "".join(output_parts)
             output_tokens_est = runner.estimate_token_count(generated_text)
@@ -76,13 +81,12 @@ def generate(request_data: GenerationRequest, request: Request) -> StreamingResp
             decode_tokens_per_sec_est = None
 
             if first_chunk_s is not None:
-                ttft_ms = elapsed_ms(request_start_s, first_chunk_s)
-                approx_prefill_plus_first_chunk_ms = max(ttft_ms - tokenization_ms, 0.0)
+                ttft_ms = elapsed_ms(tokenization_end_s, first_chunk_s)
+                approx_prefill_plus_first_chunk_ms = elapsed_ms(request_start_s, first_chunk_s)
                 stream_time_ms = elapsed_ms(first_chunk_s, end_s)
 
-                decode_tokens_after_first = max(output_tokens_est - 1, 0)
-                if stream_time_ms > 0.0 and decode_tokens_after_first > 0:
-                    decode_tokens_per_sec_est = decode_tokens_after_first / (stream_time_ms / 1000.0)
+                if stream_time_ms > 0.0 and output_tokens_est > 0:
+                    decode_tokens_per_sec_est = output_tokens_est / (stream_time_ms / 1000.0)
 
             metrics = {
                 "event": "request_metrics",
@@ -93,13 +97,18 @@ def generate(request_data: GenerationRequest, request: Request) -> StreamingResp
                 "temperature": request_data.temperature,
                 "tokenization_ms": round(tokenization_ms, 3),
                 "ttft_ms": round(ttft_ms, 3) if ttft_ms is not None else None,
-                "approx_prefill_plus_first_chunk_ms": round(approx_prefill_plus_first_chunk_ms, 3) if approx_prefill_plus_first_chunk_ms is not None else None,
+                "approx_prefill_plus_first_chunk_ms": round(approx_prefill_plus_first_chunk_ms, 3)
+                if approx_prefill_plus_first_chunk_ms is not None
+                else None,
                 "stream_time_ms": round(stream_time_ms, 3),
                 "total_time_ms": round(total_time_ms, 3),
                 "chunk_count": len(output_parts),
                 "chunk_gap_ms": [round(value, 3) for value in chunk_gaps_ms],
-                "decode_tokens_per_sec_est": round(decode_tokens_per_sec_est, 3) if decode_tokens_per_sec_est is not None else None,
+                "decode_tokens_per_sec_est": round(decode_tokens_per_sec_est, 3)
+                if decode_tokens_per_sec_est is not None
+                else None,
                 "error": error_message,
+                **memory_metrics,
             }
 
             log_request_metrics(metrics)
@@ -109,10 +118,15 @@ def generate(request_data: GenerationRequest, request: Request) -> StreamingResp
                 "output_tokens_est": output_tokens_est,
                 "tokenization_ms": round(tokenization_ms, 3),
                 "ttft_ms": round(ttft_ms, 3) if ttft_ms is not None else None,
-                "approx_prefill_plus_first_chunk_ms": round(approx_prefill_plus_first_chunk_ms, 3) if approx_prefill_plus_first_chunk_ms is not None else None,
+                "approx_prefill_plus_first_chunk_ms": round(approx_prefill_plus_first_chunk_ms, 3)
+                if approx_prefill_plus_first_chunk_ms is not None
+                else None,
                 "stream_time_ms": round(stream_time_ms, 3),
                 "total_time_ms": round(total_time_ms, 3),
-                "decode_tokens_per_sec_est": round(decode_tokens_per_sec_est, 3) if decode_tokens_per_sec_est is not None else None,
+                "decode_tokens_per_sec_est": round(decode_tokens_per_sec_est, 3)
+                if decode_tokens_per_sec_est is not None
+                else None,
+                **memory_metrics,
             }
 
             yield f"event: done\ndata: {json.dumps(client_summary)}\n\n"
