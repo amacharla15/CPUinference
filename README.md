@@ -49,26 +49,7 @@ Focus areas:
 - prompt-length experiments
 - reproducible result storage
 
-## Project 2 — CPU quantization shootout
-Goal: compare different quantization options on CPU and measure:
-- load time
-- RAM usage
-- throughput
-- simple quality proxy
 
-## Project 3 — Disk → RAM matters
-Goal: study cold-start load behavior and understand why model load time is a real product concern.
-
-## Later stages
-Planned future work includes:
-- GPU serving
-- KV-cache behavior
-- batching and concurrency
-- multi-GPU scaling
-- communication overhead
-- distributed serving systems
-
----
 
 # Current status
 
@@ -462,5 +443,6 @@ a benchmark harness
 repeated experiments
 
 reproducible result packaging
+
 
 The most important outcome was not the tiny model’s output quality. The most important outcome was learning how to reason about inference as a systems problem: request flow, observability, benchmarking, and reproducibility.
