@@ -7,17 +7,17 @@ from threading import Event, Thread
 
 import psutil
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, QuantoConfig 
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", default="distilgpt2")
+    parser.add_argument("--model_name", default="facebook/opt-125m")
     parser.add_argument("--prompts_file", default="Project2/prompts/quality_prompts.json")
     parser.add_argument("--output_dir", default="Project2/results")
     parser.add_argument("--max_new_tokens", type=int, default=40)
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--mode", default="fp", choices=["fp"])
+    parser.add_argument("--mode", default="fp", choices=["fp","int8","int4"])
     return parser.parse_args()
 
 
@@ -93,7 +93,23 @@ def main():
     load_start = time.perf_counter()
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    model = AutoModelForCausalLM.from_pretrained(args.model_name)
+
+    if args.mode == "fp":
+        model = AutoModelForCausalLM.from_pretrained(args.model_name)
+    elif args.mode == "int8":
+        quant_config = QuantoConfig(weights="int8")
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name,
+            quantization_config=quant_config,
+        )
+    elif args.mode == "int4":
+        quant_config = QuantoConfig(weights="int4")
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name,
+            quantization_config=quant_config,
+        )
+    else:
+        raise ValueError(f"Unsupported mode: {args.mode}")
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
