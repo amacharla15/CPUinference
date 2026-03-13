@@ -1,0 +1,22 @@
+[
+  {
+    "name": "simple_cpu",
+    "prompt": "Explain CPU inference in one simple sentence."
+  },
+  {
+    "name": "ttft",
+    "prompt": "What is TTFT in LLM inference?"
+  },
+  {
+    "name": "ram",
+    "prompt": "Why can quantization reduce RAM usage?"
+  },
+  {
+    "name": "tradeoff",
+    "prompt": "Explain the tradeoff between speed, memory, and quality in model quantization."
+  },
+  {
+    "name": "compare",
+    "prompt": "Give a short comparison of int8 and int4 quantization."
+  }
+]
